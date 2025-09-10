@@ -6,21 +6,16 @@
   <title>Simulador de Qualidade de Energia</title>
 <body>
   <script>
-    // senha definida
-    const senhaCorreta = "1234";  // troque aqui pela sua senha
-
-    // pede senha ao carregar
+    const senhaCorreta = "1234"; // troque pela sua senha
     const tentativa = prompt("Digite a senha para acessar o simulador:");
 
     if (tentativa !== senhaCorreta) {
-      document.body.innerHTML = "<h2 style='color:red;text-align:center;margin-top:50px'>Acesso negado ❌</h2>";
-      throw new Error("Acesso negado");
+      // Limpa tudo e exibe só "acesso negado"
+      document.write("<h2 style='color:red;text-align:center;margin-top:50px'>Acesso negado ❌</h2>");
+      // Garante que o navegador não continue carregando nada
+      window.stop();
     }
   </script>
-
-  <noscript>Ative o JavaScript para usar o Simulador de Qualidade de Energia.</noscript>
-  <header>
-    <h1>Simulador de Qualidade de Energia ⚡</h1>
 
   
   <!-- Plotly loader com fallback -->
