@@ -81,6 +81,9 @@
     .kpi .label { color: var(--muted); font-size: 12px; }
     .kpi .val { font-size: 18px; font-weight: 700; }
 
+    /* KPI area for actions */
+    #kpis-acao { margin-top: 14px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
     footer { color: var(--muted); font-size: 12px; padding: 14px 18px; }
     .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .mt8 { margin-top: 8px; }
@@ -185,6 +188,8 @@
     <section class="card">
       <h3>Resultado da Simulação</h3>
       <div id="grafico"></div>
+
+      <div id="kpis-acao"></div>
 
       <div class="row3 mt8">
         <div>
@@ -373,11 +378,48 @@
       return {t, y};
     }
 
-    async function plotResultado(traces, tensao) {
+    async function plotResultado(traces, tensao, destaqueAcao) {
       const Plotly = await ensurePlotly();
+      // Add nominal line
       traces.push({ x: traces[0].x, y: Array(traces[0].x.length).fill(tensao), mode: 'lines', name: `Tensão Nominal (${tensao} V)`, line: { dash: 'dash', color: 'gray' } });
+
+      // style traces: highlight selected action
+      traces = traces.map(tr => {
+        if (!tr.meta) tr.meta = {};
+        const a = tr.meta.acao || tr.name || '';
+        if (destaqueAcao && a === destaqueAcao) {
+          tr.line = tr.line || {};
+          tr.line.width = 4;
+          tr.line.color = '#a78bfa';
+        } else if (destaqueAcao && destaqueAcao !== 'Todas') {
+          // fade others
+          tr.line = tr.line || {};
+          tr.line.width = tr.line.width || 1;
+          tr.line.color = 'rgba(255,255,255,0.15)';
+        } else if (destaqueAcao === 'Todas') {
+          // if all, highlight AFP-QEE
+          if (a && a.startsWith('AFP-QEE')) { tr.line = tr.line || {}; tr.line.width = 4; tr.line.color = '#a78bfa'; }
+          else { tr.line = tr.line || {}; tr.line.width = 1; tr.line.color = 'rgba(255,255,255,0.18)'; }
+        }
+        return tr;
+      });
+
       const layout = { title: 'Simulação de Qualidade de Energia', xaxis: { title: 'Tempo (s)' }, yaxis: { title: 'Tensão (V)' }, margin: { t: 40, r: 20, b: 40, l: 50 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5e7eb' } };
-      Plotly.newPlot('grafico', traces, layout, {displayModeBar: true, responsive: true});
+      await Plotly.newPlot('grafico', traces, layout, {displayModeBar: true, responsive: true});
+
+      // blink animation for highlighted trace (3s)
+      if (destaqueAcao && destaqueAcao !== 'Todas') {
+        try {
+          const idx = traces.findIndex(tr => (tr.meta && tr.meta.acao === destaqueAcao) || tr.name === destaqueAcao);
+          if (idx >= 0) {
+            let tcount = 0; let on = true;
+            const timer = setInterval(()=>{
+              Plotly.restyle('grafico', {'line.width': on ? 8 : 4}, [idx]);
+              on = !on; tcount += 1; if (tcount>5) { clearInterval(timer); Plotly.restyle('grafico', {'line.width':4}, [idx]); }
+            }, 500);
+          }
+        } catch(e){ /* ignore animation errors */ }
+      }
     }
 
     async function simular() {
@@ -391,26 +433,55 @@
 
       const acoes = (acao === 'Todas') ? ['Compensador Dinâmico', 'Banco de Capacitores', 'AFP-QEE (projeto desenvolvido pela Expert Energy)', 'Sem Correção'] : [acao];
 
-      const traces = [];
+      let traces = [];
+      const resultados = [];
       for (const a of acoes) {
         let serie;
         if (tipo === 'sag') serie = gerarSerieTempoSAG({profundidade, duracao, tensao, acao: a});
         else if (tipo === 'surge') serie = gerarSerieTempoSURGE({profundidade, duracao, tensao, acao: a});
         else if (tipo === 'interrupt') serie = gerarSerieTempoINTERRUP({profundidade, duracao, tensao, acao: a});
-        else if (tipo === 'harm') { const wave = gerarWaveHARM({tensao}); traces.push({ x: wave.t, y: wave.y, mode: 'lines', name: `${a} (harmônicos)` }); continue; }
-        else if (tipo === 'flicker') { const wave = gerarWaveFLICKER({tensao}); traces.push({ x: wave.t, y: wave.y, mode: 'lines', name: `${a} (flicker)` }); continue; }
-        traces.push({ x: serie.t, y: serie.y, mode: 'lines', name: a });
+        else if (tipo === 'harm') {
+          const wave = gerarWaveHARM({tensao});
+          traces.push({ x: wave.t, y: wave.y, mode: 'lines', name: `${a} (harmônicos)`, meta: { acao: a } });
+          resultados.push({acao: a, min: Math.min(...wave.y), final: wave.y[wave.y.length-1], efet: efetividadeAcao(a)});
+          continue;
+        } else if (tipo === 'flicker') {
+          const wave = gerarWaveFLICKER({tensao});
+          traces.push({ x: wave.t, y: wave.y, mode: 'lines', name: `${a} (flicker)`, meta: { acao: a } });
+          resultados.push({acao: a, min: Math.min(...wave.y), final: wave.y[wave.y.length-1], efet: efetividadeAcao(a)});
+          continue;
+        }
+        traces.push({ x: serie.t, y: serie.y, mode: 'lines', name: a, meta: { acao: a } });
+        resultados.push({acao: a, min: Math.min(...serie.y), final: serie.y[serie.y.length-1], efet: efetividadeAcao(a)});
       }
 
-      if (tipo === 'harm' || tipo === 'flicker') {
-        const Plotly = await ensurePlotly();
-        const layout = { title: (tipo === 'harm') ? 'Forma de Onda com Harmônicos' : 'Forma de Onda com Flicker', xaxis: { title: 'Tempo (s)' }, yaxis: { title: 'Tensão Instantânea (V pico)' }, margin: { t: 40, r: 20, b: 40, l: 55 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5e7eb' } };
-        Plotly.newPlot('grafico', traces, layout, {displayModeBar: true, responsive: true});
-      } else {
-        await plotResultado(traces, tensao);
-      }
-
+      await plotResultado(traces, tensao, acao);
+      renderKPIsAcao(resultados, acao);
       atualizarKPIs();
+    }
+
+    function renderKPIsAcao(resultados, acaoSelecionada) {
+      const container = document.getElementById('kpis-acao');
+      if (!container) return;
+      container.innerHTML = '';
+      // if single action, show three KPI cards
+      if (resultados.length === 1) {
+        const r = resultados[0];
+        container.innerHTML = `
+          <div class="kpi"><div class="label">Ação</div><div class="val">${r.acao}</div></div>
+          <div class="kpi"><div class="label">Efetividade da correção</div><div class="val">${(r.efet*100).toFixed(0)}%</div></div>
+          <div class="kpi"><div class="label">Tensão mínima (V)</div><div class="val">${r.min.toFixed(2)}</div></div>
+          <div class="kpi"><div class="label">Tensão final (V)</div><div class="val">${r.final.toFixed(2)}</div></div>
+        `;
+      } else {
+        // multiple actions -> show small card per action
+        resultados.forEach(r => {
+          const div = document.createElement('div');
+          div.className = 'kpi';
+          div.innerHTML = `<div class="label">${r.acao}</div><div class="val">Efet: ${(r.efet*100).toFixed(0)}%<br/>Min: ${r.min.toFixed(1)} V<br/>Final: ${r.final.toFixed(1)} V</div>`;
+          container.appendChild(div);
+        });
+      }
     }
 
     function calcularAfundamento() {
@@ -477,28 +548,61 @@
 
     // ===== PDF =====
     async function gerarPDF() {
+      const params = {
+        tipo: document.getElementById('tipo').value,
+        profundidade: document.getElementById('profundidade').value,
+        duracao: document.getElementById('duracao').value,
+        tensao: document.getElementById('tensao_nominal').value,
+        acao: document.getElementById('acao').value,
+        carga: document.getElementById('carga').value,
+        distancia: document.getElementById('distancia').value
+      };
+
       const area = document.getElementById('relatorio-area');
+      // capture main area
       const canvas = await html2canvas(area, {scale: 2, backgroundColor: '#ffffff'});
       const imgData = canvas.toDataURL('image/png');
 
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const margin = 20; // mm
+      const usableW = pageW - margin*2;
 
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth - 48;
-      const imgHeight = canvas.height * imgWidth / canvas.width;
+      // Page 1 - header + main image
+      pdf.setFontSize(16);
+      pdf.text('Relatório - Simulador de Qualidade de Energia', margin, 20);
+      pdf.setFontSize(10);
+      pdf.text('Data: ' + new Date().toLocaleString(), margin, 28);
+      pdf.text(`Parâmetros: Tipo=${params.tipo} | Profundidade=${params.profundidade}% | Duração=${params.duracao}s | Tensão=${params.tensao}V | Ação=${params.acao}`, margin, 34);
 
-      pdf.setFontSize(14);
-      pdf.text('Relatório - Simulador de Qualidade de Energia', 24, 28);
-      pdf.addImage(imgData, 'PNG', 24, 40, imgWidth, Math.min(imgHeight, pageHeight - 80));
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgH = (imgProps.height * usableW) / imgProps.width;
+      pdf.addImage(imgData, 'PNG', margin, 40, usableW, Math.min(imgH, 250));
 
+      // Page 2 - KPIs da ação
+      const kpisNode = document.getElementById('kpis-acao');
+      if (kpisNode) {
+        const kpiCanvas = await html2canvas(kpisNode, {scale:2, backgroundColor:'#ffffff'});
+        const kpiImg = kpiCanvas.toDataURL('image/png');
+        pdf.addPage();
+        pdf.setFontSize(14); pdf.text('Resultados da Ação Corretiva', margin, 20);
+        const kpiProps = pdf.getImageProperties(kpiImg);
+        const kpiH = (kpiProps.height * usableW) / kpiProps.width;
+        pdf.addImage(kpiImg, 'PNG', margin, 28, usableW, Math.min(kpiH, 250));
+      }
+
+      // Page 3 - ROI
       const roiNode = document.querySelector('#grafico-roi');
-      const roiCanvas = await html2canvas(roiNode, {scale: 2, backgroundColor: '#ffffff'});
-      const roiImg = roiCanvas.toDataURL('image/png');
-      pdf.addPage();
-      pdf.text('ROI - Investimento vs Economia', 24, 28);
-      pdf.addImage(roiImg, 'PNG', 24, 40, imgWidth, 280);
+      if (roiNode) {
+        const roiCanvas = await html2canvas(roiNode, {scale:2, backgroundColor:'#ffffff'});
+        const roiImg = roiCanvas.toDataURL('image/png');
+        pdf.addPage();
+        pdf.setFontSize(14); pdf.text('ROI - Investimento vs Economia', margin, 20);
+        const roiProps = pdf.getImageProperties(roiImg);
+        const roiH = (roiProps.height * usableW) / roiProps.width;
+        pdf.addImage(roiImg, 'PNG', margin, 28, usableW, Math.min(roiH, 250));
+      }
 
       pdf.save('relatorio-qualidade-energia.pdf');
     }
