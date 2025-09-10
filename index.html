@@ -1,110 +1,74 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Simulador de Qualidade de Energia</title>
-  <!-- Carregador robusto do Plotly com fallback -->
+
+  <!-- Plotly loader com fallback -->
   <script>
     (function(){
       window.__plotlyReady = new Promise(function(resolve, reject){
-        function done(){
-          if (window.Plotly) { resolve(window.Plotly); }
-          else { reject(new Error('Plotly não carregou.')); }
-        }
-        if (window.Plotly) return resolve(window.Plotly);
-        var s = document.createElement('script');
-        s.src = 'https://cdn.plot.ly/plotly-2.30.0.min.js';
-        s.async = true;
-        s.onload = done;
-        s.onerror = function(){
-          var s2 = document.createElement('script');
-          s2.src = 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.30.0/plotly.min.js';
-          s2.async = true;
-          s2.onload = done;
-          s2.onerror = function(){ reject(new Error('Falha ao carregar Plotly de ambos os CDNs.')); };
+        function done(){ if(window.Plotly) resolve(window.Plotly); else reject(new Error('Plotly não carregou.')); }
+        if(window.Plotly) return resolve(window.Plotly);
+        var s=document.createElement('script');
+        s.src='https://cdn.plot.ly/plotly-2.30.0.min.js';
+        s.async=true; s.onload=done;
+        s.onerror=function(){
+          var s2=document.createElement('script');
+          s2.src='https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.30.0/plotly.min.js';
+          s2.async=true; s2.onload=done;
+          s2.onerror=function(){ reject(new Error('Falha ao carregar Plotly de ambos os CDNs.')); };
           document.head.appendChild(s2);
         };
         document.head.appendChild(s);
       });
     })();
   </script>
-  <!-- jsPDF & html2canvas para relatório PDF -->
+
+  <!-- jsPDF & html2canvas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+
   <style>
-    :root {
-      --bg: #0f172a;      /* slate-900 */
-      --panel: #111827;   /* gray-900 */
-      --card: #1f2937;    /* gray-800 */
-      --muted: #94a3b8;   /* slate-400 */
-      --text: #e5e7eb;    /* gray-200 */
-      --accent: #22d3ee;  /* cyan-400 */
-      --accent-2: #a78bfa;/* violet-400 */
-      --ok: #34d399;      /* emerald-400 */
-      --warn: #f59e0b;    /* amber-500 */
-      --danger: #f87171;  /* red-400 */
+    :root{
+      --bg:#0f172a; --card:#1f2937; --muted:#94a3b8; --text:#e5e7eb;
+      --accent:#22d3ee; --accent-2:#a78bfa;
     }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      background: radial-gradient(1200px 800px at 70% -10%, rgba(34,211,238,0.08), transparent 50%),
-                  radial-gradient(1000px 600px at -10% 20%, rgba(167,139,250,0.09), transparent 60%), var(--bg);
-      color: var(--text);
-    }
-    header { padding: 22px 24px 8px; }
-    h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0.2px; }
-    .subtitle { color: var(--muted); font-size: 14px; }
-
-    .container { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 16px; }
-
-    .card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00)); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px 14px 16px; backdrop-filter: blur(6px); box-shadow: 0 10px 25px rgba(0,0,0,0.25); }
-    .card h3 { margin: 4px 0 12px; font-size: 16px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-
-    label { display: block; font-size: 12px; color: var(--muted); margin: 6px 0 6px; }
-    input, select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: #0b1220; color: var(--text); }
-    input[type="range"] { padding: 0; }
-    .value { font-size: 12px; color: var(--accent); margin-left: 6px; }
-
-    .btn { cursor: pointer; border: none; border-radius: 12px; padding: 10px 14px; color: #0b1220; font-weight: 600; transition: transform .06s ease; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-    .btn:active { transform: translateY(1px); }
-    .btn.secondary { background: transparent; color: var(--text); border: 1px solid rgba(255,255,255,0.12); }
-    .btn.warn { background: var(--warn); color: #111; }
-
-    #grafico { height: 420px; }
-
-    .kpis { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
-    .kpi { background: #0b1220; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; }
-    .kpi .label { color: var(--muted); font-size: 12px; }
-    .kpi .val { font-size: 18px; font-weight: 700; }
-
-    /* KPI area for actions */
-    #kpis-acao { margin-top: 14px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-
-    footer { color: var(--muted); font-size: 12px; padding: 14px 18px; }
-    .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .mt8 { margin-top: 8px; }
-    .mt12 { margin-top: 12px; }
-    .mt16 { margin-top: 16px; }
-    .mt20 { margin-top: 20px; }
-
-    @media (max-width: 980px) { .container { grid-template-columns: 1fr; } #grafico { height: 360px; } }
-
-    .diag { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans; background:var(--bg); color:var(--text);}
+    header{padding:20px 24px}
+    h1{margin:0;font-size:26px}
+    .subtitle{color:var(--muted);font-size:13px;margin-top:6px}
+    .container{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    label{font-size:12px;color:var(--muted);margin-bottom:6px;display:block}
+    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#081019;color:var(--text)}
+    .btn{cursor:pointer;border-radius:10px;padding:10px 12px;border:none;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#071223;font-weight:700}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.08);color:var(--text)}
+    #grafico{height:420px}
+    .kpis{display:grid;gap:10px;grid-template-columns:repeat(3,1fr);margin-top:10px}
+    .kpi{background:#07101a;border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.04)}
+    .kpi .label{color:var(--muted);font-size:12px}
+    .kpi .val{font-size:18px;font-weight:700}
+    #kpis-acao{margin-top:14px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+    .legend{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+    .legend .item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+    .swatch{width:14px;height:10px;border-radius:3px;display:inline-block}
+    footer{padding:12px 18px;color:var(--muted);font-size:12px}
+    @media(max-width:980px){.container{grid-template-columns:1fr} #grafico{height:320px}}
   </style>
 </head>
 <body>
-  <noscript>Ative o JavaScript para usar o Simulador de Qualidade de Energia.</noscript>
   <header>
     <h1>Simulador de Qualidade de Energia ⚡</h1>
     <div class="subtitle">Simule distúrbios, compare soluções, gere relatório em PDF e estime ROI.</div>
   </header>
 
   <div class="container" id="relatorio-area">
-    <!-- Painel de Controles -->
+    <!-- Controls -->
     <section class="card" id="painel-controles">
       <h3>Parâmetros da Simulação</h3>
 
@@ -117,7 +81,7 @@
         <option value="flicker">Flicker (Cintilação)</option>
       </select>
 
-      <div class="row mt8">
+      <div class="row" style="margin-top:10px">
         <div>
           <label>Profundidade / Amplitude (%) <span class="value" id="lbl-profundidade">40</span></label>
           <input type="range" id="profundidade" min="0" max="100" value="40" />
@@ -128,7 +92,7 @@
         </div>
       </div>
 
-      <div class="row mt8">
+      <div class="row" style="margin-top:10px">
         <div>
           <label>Carga Afetada (kW)</label>
           <input type="number" id="carga" min="1" max="10000" value="50" />
@@ -139,7 +103,7 @@
         </div>
       </div>
 
-      <div class="row mt8">
+      <div class="row" style="margin-top:10px">
         <div>
           <label>Tensão Nominal</label>
           <select id="tensao_nominal">
@@ -162,36 +126,33 @@
         </div>
       </div>
 
-      <div class="row mt12">
+      <div style="margin-top:12px;display:flex;gap:8px">
         <button class="btn" id="btn-simular">Simular</button>
         <button class="btn secondary" id="btn-reset">Restaurar padrões</button>
       </div>
 
-      <div class="kpis mt12">
-        <div class="kpi">
-          <div class="label">Afundamento / Queda estimada</div>
-          <div class="val" id="kpi-afundamento">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Queda de Tensão na Linha</div>
-          <div class="val" id="kpi-queda">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Tensão Nominal</div>
-          <div class="val" id="kpi-nominal">220 V</div>
-        </div>
+      <div class="kpis" style="margin-top:12px">
+        <div class="kpi"><div class="label">Afundamento / Queda estimada</div><div class="val" id="kpi-afundamento">—</div></div>
+        <div class="kpi"><div class="label">Queda de Tensão na Linha</div><div class="val" id="kpi-queda">—</div></div>
+        <div class="kpi"><div class="label">Tensão Nominal</div><div class="val" id="kpi-nominal">220 V</div></div>
       </div>
-      <div class="diag" id="diag-plotly">Status gráficos: verificando…</div>
+
+      <div class="diag" id="diag-plotly" style="margin-top:8px;color:var(--muted)">Status gráficos: verificando…</div>
     </section>
 
-    <!-- Área de Gráfico / Resultados -->
+    <!-- Graph / Results -->
     <section class="card">
       <h3>Resultado da Simulação</h3>
+
       <div id="grafico"></div>
 
+      <!-- Legend -->
+      <div class="legend" id="legend-area" aria-hidden="false" style="margin-top:10px"></div>
+
+      <!-- KPIs per action -->
       <div id="kpis-acao"></div>
 
-      <div class="row3 mt8">
+      <div class="row3" style="margin-top:12px">
         <div>
           <label>Tensão Nominal (para cálculo do afundamento)</label>
           <input type="number" id="calc_nominal" value="220" />
@@ -200,39 +161,33 @@
           <label>Tensão Medida</label>
           <input type="number" id="calc_medida" value="180" />
         </div>
-        <div class="flex mt20">
+        <div style="display:flex;align-items:flex-end;gap:8px">
           <button class="btn secondary" id="btn-calc-afund">Calcular Afundamento</button>
-          <span id="resultado_afundamento" class="value"></span>
+          <span id="resultado_afundamento" class="value" style="color:var(--accent)"></span>
         </div>
       </div>
 
-      <div class="row mt12">
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
         <button class="btn secondary" id="btn-calc-queda">Calcular Queda de Tensão</button>
-        <span id="resultado_queda" class="value"></span>
+        <span id="resultado_queda" class="value" style="color:var(--accent)"></span>
       </div>
 
-      <div class="row mt16">
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
         <button class="btn" id="btn-pdf">Gerar Relatório em PDF</button>
-        <span class="subtitle">O relatório inclui parâmetros, KPIs e o gráfico.</span>
+        <div class="subtitle" style="margin-left:8px;color:var(--muted)">O relatório inclui parâmetros, KPIs e o gráfico (A4 retrato).</div>
       </div>
     </section>
   </div>
 
-  <!-- ROI -->
+  <!-- ROI area (kept) -->
   <div class="container">
     <section class="card">
       <h3>Estimativa de ROI</h3>
       <div class="row">
-        <div>
-          <label>Investimento da Solução (R$)</label>
-          <input type="number" id="roi_invest" value="150000" min="0" step="1000" />
-        </div>
-        <div>
-          <label>Custo da Falha por Ano (R$)</label>
-          <input type="number" id="roi_custo_falha" value="300000" min="0" step="1000" />
-        </div>
+        <div><label>Investimento da Solução (R$)</label><input type="number" id="roi_invest" value="150000" min="0" step="1000" /></div>
+        <div><label>Custo da Falha por Ano (R$)</label><input type="number" id="roi_custo_falha" value="300000" min="0" step="1000" /></div>
       </div>
-      <div class="row mt8">
+      <div class="row" style="margin-top:8px">
         <div>
           <label>Efetividade esperada da ação (%)</label>
           <input type="range" id="roi_efetividade" min="0" max="100" value="60" />
@@ -244,445 +199,428 @@
         </div>
       </div>
 
-      <div class="kpis mt12">
-        <div class="kpi">
-          <div class="label">Economia Anual Estimada</div>
-          <div class="val" id="kpi-economia">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Payback (anos)</div>
-          <div class="val" id="kpi-payback">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">ROI Acumulado</div>
-          <div class="val" id="kpi-roi">—</div>
-        </div>
+      <div class="kpis" style="margin-top:12px">
+        <div class="kpi"><div class="label">Economia Anual Estimada</div><div class="val" id="kpi-economia">—</div></div>
+        <div class="kpi"><div class="label">Payback (anos)</div><div class="val" id="kpi-payback">—</div></div>
+        <div class="kpi"><div class="label">ROI Acumulado</div><div class="val" id="kpi-roi">—</div></div>
       </div>
 
-      <div id="grafico-roi" class="mt12" style="height: 280px;"></div>
+      <div id="grafico-roi" style="height:280px;margin-top:12px"></div>
     </section>
 
     <section class="card">
       <h3>Observações Técnicas</h3>
-      <ul>
-        <li><strong>Inversores de Frequência:</strong> toleram afundamentos de até <em>30%</em> por menos de <em>0,5 s</em>. Reduções maiores que <em>40%</em> podem causar falhas.</li>
-        <li><strong>Relés de Proteção:</strong> normas IEEE/IEC indicam tolerância entre <em>10% e 90%</em> da tensão nominal por até <em>3 s</em> sem atuação indevida.</li>
+      <ul style="margin:8px 0 0 18px">
+        <li><strong>Inversores de Frequência:</strong> toleram afundamentos de até <em>30%</em> por menos de <em>0,5 s</em>.</li>
+        <li><strong>Relés de Proteção:</strong> normas IEEE/IEC indicam tolerância entre <em>10% e 90%</em> da tensão nominal por até <em>3 s</em>.</li>
         <li><strong>Concessionária (ANEEL):</strong> variação típica permitida de <em>±5%</em> (BT) e <em>±10%</em> (MT).</li>
       </ul>
     </section>
   </div>
 
-  <!-- Autotestes simples -->
-  <div class="container">
-    <section class="card">
-      <h3>Autotestes</h3>
-      <button class="btn secondary" id="btn-testes">Rodar autotestes</button>
-      <div id="test-output" class="diag"></div>
-    </section>
-  </div>
+  <footer>Desenvolvido para demonstração — versão interativa com ROI e relatório em PDF.</footer>
 
-  <footer>
-    Desenvolvido para demonstração — versão interativa com ROI e relatório em PDF.
-  </footer>
+<script>
+/* --------- Helpers & configuration --------- */
+const coresAcoes = {
+  'Compensador Dinâmico': '#22d3ee',
+  'Banco de Capacitores': '#a78bfa',
+  'AFP-QEE (projeto desenvolvido pela Expert Energy)': '#34d399',
+  'Sem Correção': '#f87171'
+};
 
-  <script>
-    // ===== Helpers de carregamento =====
-    function ensurePlotly() {
-      return window.__plotlyReady.then(function(Plotly){
-        var diag = document.getElementById('diag-plotly');
-        if (diag) diag.textContent = 'Status gráficos: Plotly OK';
-        return Plotly;
-      }).catch(function(err){
-        const el = document.getElementById('diag-plotly');
-        if (el) el.innerHTML = 'Status gráficos: <span style="color:#f87171">' + err.message + '</span>';
-        const g = document.getElementById('grafico');
-        if (g && !g.dataset.errorShown) {
-          g.dataset.errorShown = '1';
-          g.innerHTML = '<div style="padding:12px;color:#f87171">Não foi possível carregar a biblioteca de gráficos (Plotly). Verifique a conexão e bloqueadores de conteúdo.</div>';
-        }
-        throw err;
-      });
-    }
+function clamp(x,a,b){ return Math.min(Math.max(x,a),b); }
 
-    // ===== Utilidades numéricas =====
-    const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
+function efetividadeAcao(acao){
+  if(acao==='Compensador Dinâmico') return 0.9;
+  if(acao==='Banco de Capacitores') return 0.6;
+  if(acao.startsWith('AFP-QEE')) return 1.0;
+  return 0.0;
+}
 
-    function efetividadeAcao(acao) {
-      if (acao === 'Compensador Dinâmico') return 0.9;
-      if (acao === 'Banco de Capacitores') return 0.6;
-      if (acao.startsWith('AFP-QEE')) return 1.0;
-      if (acao === 'Sem Correção') return 0.0;
-      return 0.0;
-    }
+/* --------- waveform generators --------- */
+function gerarSerieTempoSAG({profundidade,duracao,tensao,acao}){
+  const n=1000,T=10;
+  const t=Array.from({length:n},(_,i)=>i*T/n);
+  const y=Array(n).fill(tensao);
+  const inicio=Math.floor(n*0.30);
+  const fim=Math.min(n-1, inicio + Math.floor((duracao/T)*n));
+  const fator=efetividadeAcao(acao);
+  const queda=profundidade/100;
+  for(let i=inicio;i<=fim;i++){
+    let base=(1-queda)*tensao;
+    let recuperada = base + (tensao*queda*fator);
+    y[i] = clamp(recuperada, 0, 1.2*tensao);
+  }
+  return {t,y,inicio,fim};
+}
 
-    function gerarSerieTempoSAG({profundidade, duracao, tensao, acao}) {
-      const n = 1000, T = 10; // 10 s
-      const t = Array.from({length: n}, (_, i) => i * T / n);
-      const y = Array(n).fill(tensao);
-      const inicio = Math.floor(n * 0.30);
-      const fim = Math.min(n - 1, inicio + Math.floor((duracao / T) * n));
+function gerarSerieTempoSURGE({profundidade,duracao,tensao,acao}){
+  const n=1000,T=10; const t=Array.from({length:n},(_,i)=>i*T/n);
+  const y=Array(n).fill(tensao);
+  const i0=Math.floor(n*0.45);
+  const janela=Math.max(2, Math.floor((duracao/T)*n));
+  const fator=efetividadeAcao(acao);
+  const amp = tensao*(profundidade/100)*(1-fator);
+  for(let k=0;k<janela;k++){ const idx=i0+k; if(idx<n) y[idx]=clamp(tensao+amp,0,1.5*tensao); }
+  return {t,y,inicio:i0,fim:i0+janela};
+}
 
-      const fator = efetividadeAcao(acao);
-      const queda = profundidade / 100; // 0..1
+function gerarSerieTempoINTERRUP({profundidade,duracao,tensao,acao}){
+  const n=1000,T=10; const t=Array.from({length:n},(_,i)=>i*T/n);
+  const y=Array(n).fill(tensao);
+  const inicio=Math.floor(n*0.35);
+  const fim=Math.min(n-1, inicio + Math.floor((duracao/T)*n));
+  const fator=efetividadeAcao(acao);
+  for(let i=inicio;i<=fim;i++){
+    const nivel = tensao * (1 - (1 - fator));
+    y[i] = clamp(nivel,0,1.2*tensao);
+  }
+  return {t,y,inicio,fim};
+}
 
-      for (let i = inicio; i <= fim; i++) {
-        let base = (1 - queda) * tensao; // afundamento
-        let recuperada = base + (tensao * queda * fator); // ação corretiva
-        y[i] = clamp(recuperada, 0, 1.2 * tensao);
+function gerarWaveHARM({tensao}){
+  const fs=5000; const T=0.2; const n=Math.floor(fs*T);
+  const t=Array.from({length:n},(_,i)=>i/fs);
+  const V = tensao/Math.sqrt(2); const h3=0.1,h5=0.07;
+  const y = t.map(tt => V*(Math.sin(2*Math.PI*60*tt)+h3*Math.sin(2*Math.PI*180*tt)+h5*Math.sin(2*Math.PI*300*tt)));
+  return {t,y,inicio:0,fim:t.length-1};
+}
+function gerarWaveFLICKER({tensao}){
+  const fs=2000; const T=2; const n=Math.floor(fs*T);
+  const t=Array.from({length:n},(_,i)=>i/fs);
+  const V=tensao/Math.sqrt(2); const m=0.15;
+  const y = t.map(tt => V*(1 + m*Math.sin(2*Math.PI*8*tt)) * Math.sin(2*Math.PI*60*tt));
+  return {t,y,inicio:0,fim:t.length-1};
+}
+
+/* --------- Plot & UI --------- */
+async function ensurePlotly(){ return window.__plotlyReady; }
+
+function buildLegend(){
+  const legend = document.getElementById('legend-area');
+  legend.innerHTML = '';
+  for(const k of Object.keys(coresAcoes)){
+    const it = document.createElement('div'); it.className='item';
+    const sw = document.createElement('span'); sw.className='swatch'; sw.style.background = coresAcoes[k];
+    it.appendChild(sw);
+    const txt = document.createElement('span'); txt.textContent = k; txt.style.color = 'var(--muted)';
+    it.appendChild(txt);
+    legend.appendChild(it);
+  }
+  // nominal
+  const itn = document.createElement('div'); itn.className='item';
+  const sn = document.createElement('span'); sn.className='swatch'; sn.style.background='linear-gradient(90deg, gray 50%, transparent 50%)';
+  sn.style.border='1px dashed rgba(255,255,255,0.12)'; sn.style.width='28px';
+  itn.appendChild(sn);
+  const ttn = document.createElement('span'); ttn.textContent='Tensão Nominal (pontilhado)';
+  ttn.style.color='var(--muted)'; itn.appendChild(ttn);
+  legend.appendChild(itn);
+}
+
+async function plotResultado(traces, tensao, destaqueAcao, shape){
+  const Plotly = await ensurePlotly();
+
+  // always set nominal after action traces
+  const nominal = { x: traces[0].x, y: Array(traces[0].x.length).fill(tensao), mode:'lines', name:`Tensão Nominal (${tensao} V)`, line:{dash:'dot', color:'gray', width:2}, meta:{acao:'Nominal'} };
+
+  // apply consistent color map & widths (traces already created with correct colors)
+  const allTraces = traces.concat([nominal]);
+
+  const layout = {
+    title: 'Simulação de Qualidade de Energia',
+    xaxis: { title: 'Tempo (s)' },
+    yaxis: { title: 'Tensão (V)' },
+    margin: { t: 40, r: 20, b: 40, l: 50 },
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#e5e7eb' },
+    shapes: shape ? [shape] : []
+  };
+
+  await Plotly.newPlot('grafico', allTraces, layout, {displayModeBar:true, responsive:true});
+
+  // if single action selected, blink/highlight that trace
+  if(destaqueAcao && destaqueAcao !== 'Todas'){
+    try{
+      const idx = allTraces.findIndex(tr => (tr.meta && tr.meta.acao === destaqueAcao) || tr.name === destaqueAcao);
+      if(idx >= 0){
+        let on=true, count=0;
+        const tmr = setInterval(()=> {
+          Plotly.restyle('grafico', {'line.width': on ? 8 : (allTraces[idx].line && allTraces[idx].line._origWidth ? allTraces[idx].line._origWidth : 4)}, [idx]);
+          on = !on; count++;
+          if(count>5){ clearInterval(tmr); Plotly.restyle('grafico', {'line.width': allTraces[idx].line && allTraces[idx].line._origWidth ? allTraces[idx].line._origWidth : 4}, [idx]); }
+        }, 450);
       }
-      return {t, y};
-    }
+    }catch(e){ /* ignore */ }
+  }
+}
 
-    function gerarSerieTempoSURGE({profundidade, duracao, tensao, acao}) {
-      const n = 1000, T = 10; const t = Array.from({length: n}, (_, i) => i * T / n);
-      const y = Array(n).fill(tensao);
-      const i0 = Math.floor(n * 0.45);
-      const janela = Math.max(2, Math.floor((duracao / T) * n));
-      const fator = efetividadeAcao(acao);
-      const amp = tensao * (profundidade / 100) * (1 - fator);
-      for (let k = 0; k < janela; k++) {
-        const idx = i0 + k;
-        if (idx < n) y[idx] = clamp(tensao + amp, 0, 1.5 * tensao);
+/* --------- Main simulation flow --------- */
+async function simular(){
+  const tipo = document.getElementById('tipo').value;
+  const profundidade = parseFloat(document.getElementById('profundidade').value);
+  const duracao = parseFloat(document.getElementById('duracao').value);
+  const tensao = parseFloat(document.getElementById('tensao_nominal').value);
+  const acaoSel = document.getElementById('acao').value;
+
+  document.getElementById('kpi-nominal').textContent = `${tensao} V`;
+
+  const acoes = (acaoSel === 'Todas') ? Object.keys(coresAcoes) : [acaoSel];
+
+  const traces = [];
+  let shape = null;
+  for(const a of acoes){
+    let serie;
+    if(tipo === 'sag') serie = gerarSerieTempoSAG({profundidade,duracao,tensao,acao:a});
+    else if(tipo === 'surge') serie = gerarSerieTempoSURGE({profundidade,duracao,tensao,acao:a});
+    else if(tipo === 'interrupt') serie = gerarSerieTempoINTERRUP({profundidade,duracao,tensao,acao:a});
+    else if(tipo === 'harm'){ const wave = gerarWaveHARM({tensao}); serie = wave; }
+    else if(tipo === 'flicker'){ const wave = gerarWaveFLICKER({tensao}); serie = wave; }
+
+    // build trace with fixed color
+    const trace = {
+      x: serie.t,
+      y: serie.y,
+      mode: 'lines',
+      name: a,
+      meta: { acao: a },
+      line: {
+        color: coresAcoes[a] || '#888',
+        width: a.startsWith('AFP-QEE') ? 4 : 2
       }
-      return {t, y};
-    }
+    };
 
-    function gerarSerieTempoINTERRUP({profundidade, duracao, tensao, acao}) {
-      const n = 1000, T = 10; const t = Array.from({length: n}, (_, i) => i * T / n);
-      const y = Array(n).fill(tensao);
-      const inicio = Math.floor(n * 0.35);
-      const fim = Math.min(n - 1, inicio + Math.floor((duracao / T) * n));
-      const fator = efetividadeAcao(acao); // 0..1
-      for (let i = inicio; i <= fim; i++) {
-        const nivel = tensao * (1 - (1 - fator)); // se fator=1, mantém nominal; se 0, vai a zero
-        y[i] = clamp(nivel, 0, 1.2 * tensao);
-      }
-      return {t, y};
-    }
-
-    function gerarWaveHARM({tensao}) {
-      const fs = 5000; const T = 0.2; const n = Math.floor(fs * T);
-      const t = Array.from({length: n}, (_, i) => i / fs);
-      const V = tensao / Math.sqrt(2);
-      const h3 = 0.1, h5 = 0.07;
-      const y = t.map(tt => V * (Math.sin(2 * Math.PI * 60 * tt) + h3 * Math.sin(2 * Math.PI * 180 * tt) + h5 * Math.sin(2 * Math.PI * 300 * tt)));
-      return {t, y};
-    }
-
-    function gerarWaveFLICKER({tensao}) {
-      const fs = 2000; const T = 2; const n = Math.floor(fs * T);
-      const t = Array.from({length: n}, (_, i) => i / fs);
-      const V = tensao / Math.sqrt(2);
-      const m = 0.15;
-      const y = t.map(tt => V * (1 + m * Math.sin(2 * Math.PI * 8 * tt)) * Math.sin(2 * Math.PI * 60 * tt));
-      return {t, y};
-    }
-
-    async function plotResultado(traces, tensao, destaqueAcao) {
-      const Plotly = await ensurePlotly();
-      // Add nominal line
-      traces.push({ x: traces[0].x, y: Array(traces[0].x.length).fill(tensao), mode: 'lines', name: `Tensão Nominal (${tensao} V)`, line: { dash: 'dash', color: 'gray' } });
-
-      // style traces: highlight selected action
-      traces = traces.map(tr => {
-        if (!tr.meta) tr.meta = {};
-        const a = tr.meta.acao || tr.name || '';
-        if (destaqueAcao && a === destaqueAcao) {
-          tr.line = tr.line || {};
-          tr.line.width = 4;
-          tr.line.color = '#a78bfa';
-        } else if (destaqueAcao && destaqueAcao !== 'Todas') {
-          // fade others
-          tr.line = tr.line || {};
-          tr.line.width = tr.line.width || 1;
-          tr.line.color = 'rgba(255,255,255,0.15)';
-        } else if (destaqueAcao === 'Todas') {
-          // if all, highlight AFP-QEE
-          if (a && a.startsWith('AFP-QEE')) { tr.line = tr.line || {}; tr.line.width = 4; tr.line.color = '#a78bfa'; }
-          else { tr.line = tr.line || {}; tr.line.width = 1; tr.line.color = 'rgba(255,255,255,0.18)'; }
-        }
-        return tr;
-      });
-
-      const layout = { title: 'Simulação de Qualidade de Energia', xaxis: { title: 'Tempo (s)' }, yaxis: { title: 'Tensão (V)' }, margin: { t: 40, r: 20, b: 40, l: 50 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5e7eb' } };
-      await Plotly.newPlot('grafico', traces, layout, {displayModeBar: true, responsive: true});
-
-      // blink animation for highlighted trace (3s)
-      if (destaqueAcao && destaqueAcao !== 'Todas') {
-        try {
-          const idx = traces.findIndex(tr => (tr.meta && tr.meta.acao === destaqueAcao) || tr.name === destaqueAcao);
-          if (idx >= 0) {
-            let tcount = 0; let on = true;
-            const timer = setInterval(()=>{
-              Plotly.restyle('grafico', {'line.width': on ? 8 : 4}, [idx]);
-              on = !on; tcount += 1; if (tcount>5) { clearInterval(timer); Plotly.restyle('grafico', {'line.width':4}, [idx]); }
-            }, 500);
-          }
-        } catch(e){ /* ignore animation errors */ }
-      }
-    }
-
-    async function simular() {
-      const tipo = document.getElementById('tipo').value;
-      const profundidade = parseFloat(document.getElementById('profundidade').value);
-      const duracao = parseFloat(document.getElementById('duracao').value);
-      const tensao = parseFloat(document.getElementById('tensao_nominal').value);
-      const acao = document.getElementById('acao').value;
-
-      document.getElementById('kpi-nominal').textContent = `${tensao} V`;
-
-      const acoes = (acao === 'Todas') ? ['Compensador Dinâmico', 'Banco de Capacitores', 'AFP-QEE (projeto desenvolvido pela Expert Energy)', 'Sem Correção'] : [acao];
-
-      let traces = [];
-      const resultados = [];
-      for (const a of acoes) {
-        let serie;
-        if (tipo === 'sag') serie = gerarSerieTempoSAG({profundidade, duracao, tensao, acao: a});
-        else if (tipo === 'surge') serie = gerarSerieTempoSURGE({profundidade, duracao, tensao, acao: a});
-        else if (tipo === 'interrupt') serie = gerarSerieTempoINTERRUP({profundidade, duracao, tensao, acao: a});
-        else if (tipo === 'harm') {
-          const wave = gerarWaveHARM({tensao});
-          traces.push({ x: wave.t, y: wave.y, mode: 'lines', name: `${a} (harmônicos)`, meta: { acao: a } });
-          resultados.push({acao: a, min: Math.min(...wave.y), final: wave.y[wave.y.length-1], efet: efetividadeAcao(a)});
-          continue;
-        } else if (tipo === 'flicker') {
-          const wave = gerarWaveFLICKER({tensao});
-          traces.push({ x: wave.t, y: wave.y, mode: 'lines', name: `${a} (flicker)`, meta: { acao: a } });
-          resultados.push({acao: a, min: Math.min(...wave.y), final: wave.y[wave.y.length-1], efet: efetividadeAcao(a)});
-          continue;
-        }
-        traces.push({ x: serie.t, y: serie.y, mode: 'lines', name: a, meta: { acao: a } });
-        resultados.push({acao: a, min: Math.min(...serie.y), final: serie.y[serie.y.length-1], efet: efetividadeAcao(a)});
-      }
-
-      await plotResultado(traces, tensao, acao);
-      renderKPIsAcao(resultados, acao);
-      atualizarKPIs();
-    }
-
-    function renderKPIsAcao(resultados, acaoSelecionada) {
-      const container = document.getElementById('kpis-acao');
-      if (!container) return;
-      container.innerHTML = '';
-      // if single action, show three KPI cards
-      if (resultados.length === 1) {
-        const r = resultados[0];
-        container.innerHTML = `
-          <div class="kpi"><div class="label">Ação</div><div class="val">${r.acao}</div></div>
-          <div class="kpi"><div class="label">Efetividade da correção</div><div class="val">${(r.efet*100).toFixed(0)}%</div></div>
-          <div class="kpi"><div class="label">Tensão mínima (V)</div><div class="val">${r.min.toFixed(2)}</div></div>
-          <div class="kpi"><div class="label">Tensão final (V)</div><div class="val">${r.final.toFixed(2)}</div></div>
-        `;
-      } else {
-        // multiple actions -> show small card per action
-        resultados.forEach(r => {
-          const div = document.createElement('div');
-          div.className = 'kpi';
-          div.innerHTML = `<div class="label">${r.acao}</div><div class="val">Efet: ${(r.efet*100).toFixed(0)}%<br/>Min: ${r.min.toFixed(1)} V<br/>Final: ${r.final.toFixed(1)} V</div>`;
-          container.appendChild(div);
-        });
-      }
-    }
-
-    function calcularAfundamento() {
-      const nominal = parseFloat(document.getElementById('calc_nominal').value);
-      const medida = parseFloat(document.getElementById('calc_medida').value);
-      const el = document.getElementById('resultado_afundamento');
-      if (nominal > 0) {
-        const af = ((nominal - medida) / nominal) * 100;
-        el.textContent = `Afundamento de tensão: ${af.toFixed(2)}%`;
-        document.getElementById('kpi-afundamento').textContent = `${af.toFixed(2)}%`;
-      } else {
-        el.textContent = 'Tensão nominal deve ser maior que zero.';
-      }
-    }
-
-    function calcularQuedaLinha() {
-      const carga = parseFloat(document.getElementById('carga').value);
-      const distancia = parseFloat(document.getElementById('distancia').value);
-      const tensao = parseFloat(document.getElementById('tensao_nominal').value);
-      const resistencia_por_km = 0.4; // ohm/km (cobre típico)
-      const comprimento_km = distancia / 1000;
-      const corrente = (carga * 1000) / tensao; // I = P/V (aprox. monofásica)
-      const queda = corrente * resistencia_por_km * comprimento_km; // V
-      const perc = (queda / tensao) * 100;
-      const msg = `Queda estimada: ${queda.toFixed(2)} V (${perc.toFixed(2)}%)`;
-      document.getElementById('resultado_queda').textContent = msg;
-      document.getElementById('kpi-queda').textContent = `${perc.toFixed(2)}%`;
-    }
-
-    function atualizarKPIs() { calcularQuedaLinha(); calcularAfundamento(); }
-
-    // ===== ROI =====
-    async function atualizarROI() {
-      const invest = parseFloat(document.getElementById('roi_invest').value) || 0;
-      const custoFalha = parseFloat(document.getElementById('roi_custo_falha').value) || 0;
-      const efet = parseFloat(document.getElementById('roi_efetividade').value) / 100;
-      const anos = parseInt(document.getElementById('roi_anos').value) || 1;
-
-      const economiaAnual = custoFalha * efet;
-      const payback = economiaAnual > 0 ? invest / economiaAnual : Infinity;
-      const roiAcumulado = economiaAnual * anos - invest;
-      const roiPct = invest > 0 ? (roiAcumulado / invest) * 100 : 0;
-
-      document.getElementById('kpi-economia').textContent = `R$ ${economiaAnual.toLocaleString('pt-BR', {maximumFractionDigits: 0})}`;
-      document.getElementById('kpi-payback').textContent = (payback === Infinity) ? '—' : `${payback.toFixed(2)}`;
-      document.getElementById('kpi-roi').textContent = `${roiPct.toFixed(1)}%`;
-
-      const anosArr = Array.from({length: anos}, (_, i) => i + 1);
-      const ecoAcum = anosArr.map(a => economiaAnual * a);
-
-      try {
-        const Plotly = await ensurePlotly();
-        const bar1 = { x: anosArr, y: ecoAcum, type: 'bar', name: 'Economia Acumulada (R$)' };
-        const bar2 = { x: anosArr, y: anosArr.map(_ => invest), type: 'bar', name: 'Investimento (R$)' };
-        const layout = { barmode: 'group', paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: {color: '#e5e7eb'}, margin: {t: 20, r: 10, b: 40, l: 50}, xaxis: {title: 'Anos'}, yaxis: {title: 'R$'} };
-        Plotly.newPlot('grafico-roi', [bar1, bar2], layout, {displayModeBar: false, responsive: true});
-      } catch (e) {
-        const roi = document.getElementById('grafico-roi');
-        if (roi) roi.innerHTML = '<div style="padding:12px;color:#f87171">Não foi possível renderizar o gráfico de ROI sem o Plotly.</div>';
-      }
-
-      document.getElementById('lbl-efetividade').textContent = `${Math.round(efet*100)}%`;
-    }
-
-    // ===== PDF =====
-    async function gerarPDF() {
-      const params = {
-        tipo: document.getElementById('tipo').value,
-        profundidade: document.getElementById('profundidade').value,
-        duracao: document.getElementById('duracao').value,
-        tensao: document.getElementById('tensao_nominal').value,
-        acao: document.getElementById('acao').value,
-        carga: document.getElementById('carga').value,
-        distancia: document.getElementById('distancia').value
+    traces.push(trace);
+    // create single shape for event duration based on first serie (useful when multiple)
+    if(!shape && typeof serie.inicio !== 'undefined'){
+      shape = {
+        type:'rect', xref:'x', yref:'paper',
+        x0: serie.t[serie.inicio], x1: serie.t[serie.fim] || serie.t[serie.inicio],
+        y0:0, y1:1,
+        fillcolor:'rgba(250,200,80,0.08)', line:{width:0}
       };
-
-      const area = document.getElementById('relatorio-area');
-      // capture main area
-      const canvas = await html2canvas(area, {scale: 2, backgroundColor: '#ffffff'});
-      const imgData = canvas.toDataURL('image/png');
-
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const margin = 20; // mm
-      const usableW = pageW - margin*2;
-
-      // Page 1 - header + main image
-      pdf.setFontSize(16);
-      pdf.text('Relatório - Simulador de Qualidade de Energia', margin, 20);
-      pdf.setFontSize(10);
-      pdf.text('Data: ' + new Date().toLocaleString(), margin, 28);
-      pdf.text(`Parâmetros: Tipo=${params.tipo} | Profundidade=${params.profundidade}% | Duração=${params.duracao}s | Tensão=${params.tensao}V | Ação=${params.acao}`, margin, 34);
-
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgH = (imgProps.height * usableW) / imgProps.width;
-      pdf.addImage(imgData, 'PNG', margin, 40, usableW, Math.min(imgH, 250));
-
-      // Page 2 - KPIs da ação
-      const kpisNode = document.getElementById('kpis-acao');
-      if (kpisNode) {
-        const kpiCanvas = await html2canvas(kpisNode, {scale:2, backgroundColor:'#ffffff'});
-        const kpiImg = kpiCanvas.toDataURL('image/png');
-        pdf.addPage();
-        pdf.setFontSize(14); pdf.text('Resultados da Ação Corretiva', margin, 20);
-        const kpiProps = pdf.getImageProperties(kpiImg);
-        const kpiH = (kpiProps.height * usableW) / kpiProps.width;
-        pdf.addImage(kpiImg, 'PNG', margin, 28, usableW, Math.min(kpiH, 250));
-      }
-
-      // Page 3 - ROI
-      const roiNode = document.querySelector('#grafico-roi');
-      if (roiNode) {
-        const roiCanvas = await html2canvas(roiNode, {scale:2, backgroundColor:'#ffffff'});
-        const roiImg = roiCanvas.toDataURL('image/png');
-        pdf.addPage();
-        pdf.setFontSize(14); pdf.text('ROI - Investimento vs Economia', margin, 20);
-        const roiProps = pdf.getImageProperties(roiImg);
-        const roiH = (roiProps.height * usableW) / roiProps.width;
-        pdf.addImage(roiImg, 'PNG', margin, 28, usableW, Math.min(roiH, 250));
-      }
-
-      pdf.save('relatorio-qualidade-energia.pdf');
     }
+  }
 
-    // ===== Autotestes =====
-    async function rodarAutotestes(){
-      const out = document.getElementById('test-output');
-      const report = [];
-      try {
-        const P = await ensurePlotly();
-        report.push('✅ Teste 1: Plotly disponível (' + (P && P.version ? ('v' + P.version) : 'ok') + ')');
-      } catch(e) {
-        report.push('❌ Teste 1: Plotly indisponível: ' + e.message);
-      }
-      (function(){
-        const tensao = 220, profundidade = 40, duracao = 2;
-        const serie = gerarSerieTempoSAG({profundidade, duracao, tensao, acao:'Sem Correção'});
-        const max = Math.max.apply(null, serie.y);
-        const min = Math.min.apply(null, serie.y);
-        const okLimites = max <= 1.2*tensao + 1e-9 && min >= 0 - 1e-9;
-        report.push((okLimites ? '✅' : '❌') + ' Teste 2: Série SAG dentro de limites (0 a 1.2·Vn)');
-      })();
-      (function(){
-        const invest = 100000, custoFalha = 200000, efet = 0.5, anos = 3;
-        const economiaAnual = custoFalha * efet; // 100000
-        const payback = economiaAnual > 0 ? invest / economiaAnual : Infinity; // 1.0
-        const roiAcum = economiaAnual * anos - invest; // 200000
-        const roiPct = invest > 0 ? (roiAcum / invest) * 100 : 0; // 200%
-        const ok = economiaAnual===100000 && payback===1 && roiAcum===200000 && roiPct===200;
-        report.push((ok ? '✅' : '❌') + ' Teste 3: ROI cálculo base');
-      })();
-      out.innerHTML = report.map(l=>`<div>${l}</div>`).join('');
+  await plotResultado(traces, tensao, acaoSel, shape);
+  renderKPIsAcao(acoes, tipo, profundidade, duracao, tensao);
+  atualizarKPIs();
+  buildLegend();
+}
+
+/* --------- KPIs rendering --------- */
+function renderKPIsAcao(acoes, tipo, profundidade, duracao, tensao){
+  const container = document.getElementById('kpis-acao');
+  container.innerHTML = '';
+  if(acoes.length === 1){
+    const a = acoes[0];
+    let serie = (tipo==='harm') ? gerarWaveHARM({tensao}) : (tipo==='flicker' ? gerarWaveFLICKER({tensao}) : gerarSerieTempoSAG({profundidade,duracao,tensao,acao:a}));
+    const minV = Math.min(...serie.y);
+    const finalV = serie.y[serie.y.length-1];
+    const efet = efetividadeAcao(a) * 100;
+    container.innerHTML = `
+      <div class="kpi"><div class="label">Ação</div><div class="val">${a}</div></div>
+      <div class="kpi"><div class="label">Efetividade da correção</div><div class="val">${efet.toFixed(0)}%</div></div>
+      <div class="kpi"><div class="label">Tensão mínima (V)</div><div class="val">${minV.toFixed(2)}</div></div>
+      <div class="kpi"><div class="label">Tensão final (V)</div><div class="val">${finalV.toFixed(2)}</div></div>
+    `;
+  } else {
+    // multiple actions -> grid of small cards
+    const frag = document.createDocumentFragment();
+    for(const a of acoes){
+      const serie = gerarSerieTempoSAG({profundidade: parseFloat(document.getElementById('profundidade').value), duracao: parseFloat(document.getElementById('duracao').value), tensao: parseFloat(document.getElementById('tensao_nominal').value), acao: a});
+      const minV=Math.min(...serie.y), finalV=serie.y[serie.y.length-1], efet=efetividadeAcao(a)*100;
+      const div = document.createElement('div'); div.className='kpi';
+      div.innerHTML = `<div class="label">${a}</div><div class="val">Efet: ${efet.toFixed(0)}%<br>Min: ${minV.toFixed(1)} V<br>Final: ${finalV.toFixed(1)} V</div>`;
+      frag.appendChild(div);
     }
+    container.appendChild(frag);
+  }
+}
 
-    // ===== Eventos =====
-    function syncLabels() {
-      document.getElementById('lbl-profundidade').textContent = document.getElementById('profundidade').value;
-      document.getElementById('lbl-duracao').textContent = parseFloat(document.getElementById('duracao').value).toFixed(2);
-    }
+/* --------- Simple calculators & KPI updates --------- */
+function calcularAfundamento(){
+  const nominal = parseFloat(document.getElementById('calc_nominal').value);
+  const medida = parseFloat(document.getElementById('calc_medida').value);
+  const el = document.getElementById('resultado_afundamento');
+  if(nominal>0){
+    const af = ((nominal - medida)/nominal)*100;
+    el.textContent = `Afundamento de tensão: ${af.toFixed(2)}%`;
+    document.getElementById('kpi-afundamento').textContent = `${af.toFixed(2)}%`;
+  } else el.textContent='Tensão nominal deve ser maior que zero.';
+}
 
-    function addListeners() {
-      ['profundidade','duracao','carga','distancia','tensao_nominal','acao','tipo'].forEach(id => {
-        document.getElementById(id).addEventListener('input', () => { syncLabels(); simular(); });
-        document.getElementById(id).addEventListener('change', () => { syncLabels(); simular(); });
-      });
+function calcularQuedaLinha(){
+  const carga = parseFloat(document.getElementById('carga').value);
+  const distancia = parseFloat(document.getElementById('distancia').value);
+  const tensao = parseFloat(document.getElementById('tensao_nominal').value);
+  const resistencia_por_km = 0.4;
+  const comprimento_km = distancia/1000;
+  const corrente = (carga*1000)/tensao;
+  const queda = corrente * resistencia_por_km * comprimento_km;
+  const perc = (queda/tensao)*100;
+  const msg = `Queda estimada: ${queda.toFixed(2)} V (${perc.toFixed(2)}%)`;
+  document.getElementById('resultado_queda').textContent = msg;
+  document.getElementById('kpi-queda').textContent = `${perc.toFixed(2)}%`;
+}
+function atualizarKPIs(){ calcularQuedaLinha(); calcularAfundamento(); }
 
-      document.getElementById('btn-simular').addEventListener('click', () => { simular(); });
-      document.getElementById('btn-reset').addEventListener('click', () => {
-        document.getElementById('tipo').value = 'sag';
-        document.getElementById('profundidade').value = 40;
-        document.getElementById('duracao').value = 2;
-        document.getElementById('carga').value = 50;
-        document.getElementById('distancia').value = 100;
-        document.getElementById('tensao_nominal').value = 220;
-        document.getElementById('acao').value = 'Compensador Dinâmico';
-        document.getElementById('calc_nominal').value = 220;
-        document.getElementById('calc_medida').value = 180;
-        syncLabels();
-        simular();
-      });
+/* --------- ROI (kept from original) --------- */
+async function atualizarROI(){
+  const invest = parseFloat(document.getElementById('roi_invest').value) || 0;
+  const custoFalha = parseFloat(document.getElementById('roi_custo_falha').value) || 0;
+  const efet = parseFloat(document.getElementById('roi_efetividade').value)/100;
+  const anos = parseInt(document.getElementById('roi_anos').value) || 1;
+  const economiaAnual = custoFalha * efet;
+  const payback = economiaAnual>0 ? invest / economiaAnual : Infinity;
+  const roiAcumulado = economiaAnual * anos - invest;
+  const roiPct = invest>0 ? (roiAcumulado/invest)*100 : 0;
+  document.getElementById('kpi-economia').textContent = `R$ ${economiaAnual.toLocaleString('pt-BR',{maximumFractionDigits:0})}`;
+  document.getElementById('kpi-payback').textContent = payback===Infinity ? '—' : `${payback.toFixed(2)}`;
+  document.getElementById('kpi-roi').textContent = `${roiPct.toFixed(1)}%`;
 
-      document.getElementById('btn-calc-afund').addEventListener('click', calcularAfundamento);
-      document.getElementById('btn-calc-queda').addEventListener('click', calcularQuedaLinha);
-      document.getElementById('btn-pdf').addEventListener('click', gerarPDF);
-      document.getElementById('btn-testes').addEventListener('click', rodarAutotestes);
+  // plot ROI bars
+  try{
+    const Plotly = await ensurePlotly();
+    const anosArr = Array.from({length: parseInt(document.getElementById('roi_anos').value)}, (_,i)=>i+1);
+    const ecoAcum = anosArr.map(a => economiaAnual * a);
+    const bar1 = { x: anosArr, y: ecoAcum, type:'bar', name:'Economia Acumulada (R$)' };
+    const bar2 = { x: anosArr, y: anosArr.map(_=>invest), type:'bar', name:'Investimento (R$)' };
+    const layout = { barmode:'group', paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#e5e7eb'}, margin:{t:20,r:10,b:40,l:50}, xaxis:{title:'Anos'}, yaxis:{title:'R$'}};
+    Plotly.newPlot('grafico-roi',[bar1,bar2],layout,{displayModeBar:false,responsive:true});
+  }catch(e){
+    const roi = document.getElementById('grafico-roi');
+    if(roi) roi.innerHTML = '<div style="padding:12px;color:#f87171">Não foi possível renderizar o gráfico de ROI sem o Plotly.</div>';
+  }
 
-      ['roi_invest','roi_custo_falha','roi_efetividade','roi_anos'].forEach(id => {
-        document.getElementById(id).addEventListener('input', atualizarROI);
-        document.getElementById(id).addEventListener('change', atualizarROI);
-      });
-    }
+  document.getElementById('lbl-efetividade').textContent = `${Math.round(efet*100)}%`;
+}
 
-    // ===== Inicialização =====
-    window.addEventListener('DOMContentLoaded', () => {
-      addListeners();
-      syncLabels();
-      ensurePlotly().catch(()=>{});
-      simular();
-      atualizarROI();
-    });
-  </script>
+/* --------- PDF generation (A4 portrait filling page) --------- */
+async function gerarPDF(){
+  const params = {
+    tipo: document.getElementById('tipo').value,
+    profundidade: document.getElementById('profundidade').value,
+    duracao: document.getElementById('duracao').value,
+    tensao: document.getElementById('tensao_nominal').value,
+    acao: document.getElementById('acao').value,
+    carga: document.getElementById('carga').value,
+    distancia: document.getElementById('distancia').value
+  };
+
+  // capture the whole relatorio-area (includes graph, legend, KPIs)
+  const area = document.getElementById('relatorio-area');
+
+  // ensure Plotly has rendered (small delay helps rendering in canvas)
+  await new Promise(r=>setTimeout(r,250));
+
+  const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff'});
+  const imgData = canvas.toDataURL('image/png');
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+
+  // add header text (top)
+  pdf.setFontSize(14);
+  pdf.text('Relatório - Simulador de Qualidade de Energia', 10, 10);
+  pdf.setFontSize(9);
+  pdf.text(`Data: ${new Date().toLocaleString()}`, 10, 16);
+  pdf.text(`Parâmetros: Tipo=${params.tipo} | Profundidade=${params.profundidade}% | Duração=${params.duracao}s | Tensão=${params.tensao}V | Ação=${params.acao}`, 10, 22);
+
+  // draw canvas image to fill page (fit preserving aspect)
+  // compute image height to fill page width
+  const imgProps = pdf.getImageProperties(imgData);
+  const imgW = pageW;
+  const imgH = (imgProps.height * imgW) / imgProps.width;
+
+  // if result taller than page, scale to page height
+  const finalH = imgH > (pageH - 28) ? (pageH - 28) : imgH;
+  pdf.addImage(imgData, 'PNG', 0, 28, pageW, finalH);
+
+  // add KPI page
+  await new Promise(r=>setTimeout(r,100));
+  const kpisNode = document.getElementById('kpis-acao');
+  if(kpisNode){
+    const kpiCanvas = await html2canvas(kpisNode, {scale:2, backgroundColor:'#ffffff'});
+    const kpiImg = kpiCanvas.toDataURL('image/png');
+    pdf.addPage();
+    pdf.setFontSize(12); pdf.text('Resultados da Ação Corretiva', 10, 10);
+    pdf.addImage(kpiImg, 'PNG', 0, 18, pageW, (kpiCanvas.height * pageW) / kpiCanvas.width);
+  }
+
+  // ROI page
+  await new Promise(r=>setTimeout(r,100));
+  const roiNode = document.getElementById('grafico-roi');
+  if(roiNode){
+    const roiCanvas = await html2canvas(roiNode, {scale:2, backgroundColor:'#ffffff'});
+    const roiImg = roiCanvas.toDataURL('image/png');
+    pdf.addPage();
+    pdf.setFontSize(12); pdf.text('ROI - Investimento vs Economia', 10, 10);
+    pdf.addImage(roiImg, 'PNG', 0, 18, pageW, (roiCanvas.height * pageW) / roiCanvas.width);
+  }
+
+  pdf.save('relatorio-qualidade-energia.pdf');
+}
+
+/* --------- autotestes (simple) --------- */
+async function rodarAutotestes(){
+  const out = document.getElementById('test-output');
+  const report = [];
+  try{ const P = await ensurePlotly(); report.push('✅ Teste 1: Plotly disponível (' + (P && P.version ? ('v'+P.version) : 'ok') + ')'); }
+  catch(e){ report.push('❌ Teste 1: Plotly indisponível: '+e.message); }
+  (function(){ const tensao=220,profundidade=40,duracao=2; const serie=gerarSerieTempoSAG({profundidade,duracao,tensao,acao:'Sem Correção'}); const max=Math.max(...serie.y); const min=Math.min(...serie.y); report.push((max<=1.2*tensao && min>=0)?'✅ Teste 2: SAG limites OK':'❌ Teste 2: SAG fora de limites'); })();
+  (function(){ const invest=100000,custoFalha=200000,efet=0.5,anos=3; const economiaAnual=custoFalha*efet; const payback=invest/economiaAnual; const roiAcum=economiaAnual*anos-invest; const roiPct=(roiAcum/invest)*100; report.push((economiaAnual===100000 && payback===1 && roiAcum===200000 && roiPct===200)?'✅ Teste 3: ROI OK':'❌ Teste 3: ROI falhou'); })();
+  out.innerHTML = report.map(l => `<div>${l}</div>`).join('');
+}
+
+/* --------- events & init --------- */
+function syncLabels(){
+  document.getElementById('lbl-profundidade').textContent = document.getElementById('profundidade').value;
+  document.getElementById('lbl-duracao').textContent = parseFloat(document.getElementById('duracao').value).toFixed(2);
+}
+
+function addListeners(){
+  ['profundidade','duracao','carga','distancia','tensao_nominal','acao','tipo'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.addEventListener('input', ()=>{ syncLabels(); simular(); });
+    el.addEventListener('change', ()=>{ syncLabels(); simular(); });
+  });
+  document.getElementById('btn-simular').addEventListener('click', simular);
+  document.getElementById('btn-reset').addEventListener('click', ()=>{
+    document.getElementById('tipo').value='sag';
+    document.getElementById('profundidade').value=40;
+    document.getElementById('duracao').value=2;
+    document.getElementById('carga').value=50;
+    document.getElementById('distancia').value=100;
+    document.getElementById('tensao_nominal').value=220;
+    document.getElementById('acao').value='Compensador Dinâmico';
+    document.getElementById('calc_nominal').value=220;
+    document.getElementById('calc_medida').value=180;
+    syncLabels(); simular();
+  });
+  document.getElementById('btn-calc-afund').addEventListener('click', calcularAfundamento);
+  document.getElementById('btn-calc-queda').addEventListener('click', calcularQuedaLinha);
+  document.getElementById('btn-pdf').addEventListener('click', gerarPDF);
+  document.getElementById('btn-testes')?.addEventListener('click', rodarAutotestes);
+  ['roi_invest','roi_custo_falha','roi_efetividade','roi_anos'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', atualizarROI);
+    document.getElementById(id).addEventListener('change', atualizarROI);
+  });
+}
+
+/* initialize */
+window.addEventListener('DOMContentLoaded', ()=>{
+  addListeners();
+  syncLabels();
+  ensurePlotly().then(()=>{ document.getElementById('diag-plotly').textContent='Status gráficos: Plotly OK'; }).catch(e=>{
+    document.getElementById('diag-plotly').innerHTML = 'Status gráficos: <span style="color:#f87171">' + e.message + '</span>';
+  });
+  simular();
+  atualizarROI();
+  buildLegend();
+});
+</script>
 </body>
 </html>
